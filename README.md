@@ -5,8 +5,10 @@ Data analytics project tracking Oracle Red Bull Racing F1 performance using SQL,
 ## Technologies
 
 - **Python** - Data processing and automation
-- **SQL, MySQL** - Database and analytics
+- **SQL, SQLite/MySQL** - Database and analytics
 - **pandas, requests, sqlalchemy** - Data manipulation and API access
+- **matplotlib, seaborn** - Data visualization
+- **Jupyter Notebooks** - Interactive analysis
 - **Ergast F1 API** - Free F1 data source
 
 ## Features
@@ -16,6 +18,7 @@ Data analytics project tracking Oracle Red Bull Racing F1 performance using SQL,
 - ✅ Complex SQL queries for KPI analysis
 - ✅ Performance tracking and insights
 - ✅ End-to-end data pipeline
+- ✅ Interactive Jupyter Notebook analysis (2022-2024 highlighted)
 - ✅ Interactive Power BI Dashboard
 
 ## KPIs Tracked
@@ -114,6 +117,38 @@ mysql -u root -p F1_RedBull_Analytics < database/queries/analytical_queries.sql
 
 ---
 
+## Jupyter Notebook Analysis
+
+The project includes a comprehensive Jupyter notebook for interactive analysis and visualization.
+
+### Running the Notebook
+
+1. **Start Jupyter Notebook:**
+   ```bash
+   jupyter notebook
+   ```
+
+2. **Open the Analysis Notebook:**
+   - Navigate to `notebooks/F1_Analysis.ipynb`
+   - The notebook includes:
+     - Team performance overview and KPIs
+     - Season-by-season analysis with **2022-2024 highlighted**
+     - Driver comparison and statistics
+     - Detailed breakdown of recent performance (2022-2024)
+     - Interactive visualizations with Red Bull branding
+
+3. **Requirements:**
+   - Make sure you've run the data pipeline first to populate the database
+   - All dependencies are in `requirements.txt`
+
+The notebook features:
+- 📊 Highlighted visualizations for 2022-2024 seasons
+- 🏆 Performance metrics and win rates
+- 👥 Driver performance comparisons
+- 📈 Interactive charts with Red Bull color scheme
+
+---
+
 ## Project Structure
 
 ```
@@ -126,6 +161,8 @@ f1-redbull-analytics/
 │   │   └── create_tables.sql    # Database schema
 │   └── queries/
 │       └── analytical_queries.sql   # Analysis queries
+├── notebooks/
+│   └── F1_Analysis.ipynb  # Jupyter notebook for analysis
 ├── scripts/
 │   ├── extract_data.py      # Extract from API
 │   ├── transform_data.py    # Clean and transform
