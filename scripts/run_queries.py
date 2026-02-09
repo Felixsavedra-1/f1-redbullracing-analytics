@@ -8,11 +8,8 @@ try:
 except ImportError:
     print("config.py not found; using default database settings.")
     DB_CONFIG = {
-        'host': 'localhost',
-        'port': 3306,
-        'user': 'root',
-        'password': 'your_password',
-        'database': 'F1_RedBull_Analytics'
+        'type': 'sqlite',
+        'filename': 'f1_analytics.db'
     }
     DATA_PATHS = {
         'processed_data': 'data/processed/'
@@ -180,4 +177,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

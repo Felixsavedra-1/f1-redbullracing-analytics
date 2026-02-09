@@ -2,9 +2,17 @@
 Data transformation utilities for F1 analytics.
 """
 
-import pandas as pd
 import os
+import sys
+import pandas as pd
 from datetime import datetime
+
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+
+from logging_utils import setup_logging
 
 
 class F1DataTransformer:
@@ -13,6 +21,7 @@ class F1DataTransformer:
     def __init__(self, raw_data_path: str = "data/raw/", processed_data_path: str = "data/processed/") -> None:
         self.raw_path = raw_data_path
         self.processed_path = processed_data_path
+        self.logger = setup_logging()
         os.makedirs(raw_data_path, exist_ok=True)
         os.makedirs(processed_data_path, exist_ok=True)
 
@@ -20,12 +29,18 @@ class F1DataTransformer:
         """Clean and normalize circuits data."""
         path = f"{self.raw_path}circuits.csv"
         if not os.path.exists(path) or os.path.getsize(path) < 10:
-            print("circuits.csv is empty or missing; writing empty output.")
+            self.logger.warning("circuits.csv is empty or missing; writing empty output.")
             empty = pd.DataFrame()
             empty.to_csv(f"{self.processed_path}circuits_clean.csv", index=False)
             return empty
 
-        df = pd.read_csv(path)
+        try:
+            df = pd.read_csv(path)
+        except pd.errors.EmptyDataError:
+            self.logger.warning("qualifying.csv has no columns; writing empty output.")
+            empty = pd.DataFrame()
+            empty.to_csv(f"{self.processed_path}qualifying_clean.csv", index=False)
+            return empty
         df["circuit_id"] = range(1, len(df) + 1)
         df["altitude"] = df["altitude"].fillna(0)
         df = df[[
@@ -40,7 +55,7 @@ class F1DataTransformer:
             "url",
         ]]
         df.to_csv(f"{self.processed_path}circuits_clean.csv", index=False)
-        print(f"Transformed {len(df)} circuits.")
+        self.logger.info("Transformed %s circuits.", len(df))
         return df
 
     def transform_drivers(self) -> pd.DataFrame:
@@ -75,7 +90,7 @@ class F1DataTransformer:
 
         df = df[required_cols]
         df.to_csv(f"{self.processed_path}drivers_clean.csv", index=False)
-        print(f"Transformed {len(df)} drivers.")
+        self.logger.info("Transformed %s drivers.", len(df))
         return df
 
     def transform_races(self) -> pd.DataFrame:
@@ -98,7 +113,7 @@ class F1DataTransformer:
                 circuit_map = dict(zip(circuits_df["circuit_ref"], circuits_df["circuit_id"]))
                 df["circuit_id"] = df["circuit_ref"].map(circuit_map).fillna(0).astype(int)
             except Exception:
-                print("Could not map circuit_ref to circuit_id; defaulting to 0.")
+                self.logger.warning("Could not map circuit_ref to circuit_id; defaulting to 0.")
                 df["circuit_id"] = 0
 
         if "race_id" in df.columns:
@@ -108,20 +123,60 @@ class F1DataTransformer:
                 df["year"].astype(str) + df["round"].astype(str).str.zfill(2)
             ).astype(int)
 
+        required_cols = [
+            "race_id",
+            "year",
+            "round",
+            "circuit_id",
+            "race_name",
+            "race_date",
+            "race_time",
+            "url",
+        ]
+        for col in required_cols:
+            if col not in df.columns:
+                df[col] = None
+        df = df[required_cols]
+
         df.to_csv(f"{self.processed_path}races_clean.csv", index=False)
-        print(f"Transformed {len(df)} races.")
+        self.logger.info("Transformed %s races.", len(df))
         return df
 
     def transform_results(self) -> pd.DataFrame:
         """Clean and normalize race results."""
         path = f"{self.raw_path}results.csv"
+        results_columns = [
+            "race_id",
+            "driver_ref",
+            "constructor_ref",
+            "number",
+            "grid",
+            "position",
+            "position_text",
+            "position_order",
+            "points",
+            "laps",
+            "time_result",
+            "milliseconds",
+            "fastest_lap",
+            "fastest_lap_rank",
+            "fastest_lap_time",
+            "fastest_lap_speed",
+            "status",
+        ]
         if not os.path.exists(path) or os.path.getsize(path) < 10:
-            print("results.csv is empty or missing; writing empty output.")
-            empty = pd.DataFrame()
+            self.logger.warning("results.csv is empty or missing; writing empty output.")
+            empty = pd.DataFrame(columns=results_columns)
             empty.to_csv(f"{self.processed_path}results_clean.csv", index=False)
             return empty
 
-        df = pd.read_csv(path)
+        try:
+            df = pd.read_csv(path)
+        except pd.errors.EmptyDataError:
+            self.logger.warning("results.csv has no columns; writing empty output.")
+            empty = pd.DataFrame(columns=results_columns)
+            empty.to_csv(f"{self.processed_path}results_clean.csv", index=False)
+            return empty
 
         try:
             drivers_df = pd.read_csv(f"{self.raw_path}drivers.csv")
@@ -130,7 +185,7 @@ class F1DataTransformer:
             driver_map = dict(zip(drivers_df["driver_ref"], drivers_df["driver_id"]))
             df["driver_id"] = df["driver_ref"].map(driver_map)
         except Exception:
-            print("Could not map driver_ref to driver_id; defaulting to 0.")
+            self.logger.warning("Could not map driver_ref to driver_id; defaulting to 0.")
             df["driver_id"] = 0
 
         try:
@@ -140,11 +195,16 @@ class F1DataTransformer:
             )
             df["constructor_id"] = df["constructor_ref"].map(constructor_map)
         except Exception:
-            print("Could not map constructor_ref to constructor_id; defaulting to 0.")
+            self.logger.warning("Could not map constructor_ref to constructor_id; defaulting to 0.")
             df["constructor_id"] = 0
 
         if "position" in df.columns:
             df["position"] = pd.to_numeric(df["position"], errors="coerce")
+
+        if "position_text" in df.columns:
+            df["position_text"] = df["position_text"].fillna("").astype(str)
+        else:
+            df["position_text"] = ""
 
         numeric_cols = [
             "points",
@@ -157,6 +217,11 @@ class F1DataTransformer:
         for col in numeric_cols:
             if col in df.columns:
                 df[col] = df[col].fillna(0).astype(int)
+
+        if "fastest_lap_speed" in df.columns:
+            df["fastest_lap_speed"] = df["fastest_lap_speed"].fillna("").astype(str)
+        else:
+            df["fastest_lap_speed"] = ""
 
         if "milliseconds" in df.columns:
             df["milliseconds"] = pd.to_numeric(
@@ -180,6 +245,7 @@ class F1DataTransformer:
             df["status_id"] = df["status"].map(status_map).fillna(14)
         else:
             df["status_id"] = 1
+            df["status"] = ""
 
         if "position_order" not in df.columns:
             df["position_order"] = df["position"].fillna(999)
@@ -188,12 +254,35 @@ class F1DataTransformer:
         ).fillna(999).astype(int)
 
         df.to_csv(f"{self.processed_path}results_clean.csv", index=False)
-        print(f"Transformed {len(df)} results.")
+        self.logger.info("Transformed %s results.", len(df))
         return df
 
     def transform_qualifying(self) -> pd.DataFrame:
         """Clean and normalize qualifying data."""
-        df = pd.read_csv(f"{self.raw_path}qualifying.csv")
+        qualifying_columns = [
+            "race_id",
+            "driver_ref",
+            "constructor_ref",
+            "number",
+            "position",
+            "q1",
+            "q2",
+            "q3",
+        ]
+        path = f"{self.raw_path}qualifying.csv"
+        if not os.path.exists(path) or os.path.getsize(path) < 10:
+            self.logger.warning("qualifying.csv is empty or missing; writing empty output.")
+            empty = pd.DataFrame(columns=qualifying_columns)
+            empty.to_csv(f"{self.processed_path}qualifying_clean.csv", index=False)
+            return empty
+
+        try:
+            df = pd.read_csv(path)
+        except pd.errors.EmptyDataError:
+            self.logger.warning("qualifying.csv has no columns; writing empty output.")
+            empty = pd.DataFrame(columns=qualifying_columns)
+            empty.to_csv(f"{self.processed_path}qualifying_clean.csv", index=False)
+            return empty
 
         try:
             drivers_df = pd.read_csv(f"{self.raw_path}drivers.csv")
@@ -202,7 +291,7 @@ class F1DataTransformer:
             driver_map = dict(zip(drivers_df["driver_ref"], drivers_df["driver_id"]))
             df["driver_id"] = df["driver_ref"].map(driver_map)
         except Exception:
-            print("Could not map driver_ref to driver_id; defaulting to 0.")
+            self.logger.warning("Could not map driver_ref to driver_id; defaulting to 0.")
             df["driver_id"] = 0
 
         try:
@@ -212,7 +301,7 @@ class F1DataTransformer:
             )
             df["constructor_id"] = df["constructor_ref"].map(constructor_map)
         except Exception:
-            print("Could not map constructor_ref to constructor_id; defaulting to 0.")
+            self.logger.warning("Could not map constructor_ref to constructor_id; defaulting to 0.")
             df["constructor_id"] = 0
 
         for col in ["q1", "q2", "q3"]:
@@ -226,14 +315,14 @@ class F1DataTransformer:
                 df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
 
         df.to_csv(f"{self.processed_path}qualifying_clean.csv", index=False)
-        print(f"Transformed {len(df)} qualifying results.")
+        self.logger.info("Transformed %s qualifying results.", len(df))
         return df
 
     def transform_pit_stops(self) -> pd.DataFrame:
         """Clean and normalize pit stop data."""
         path = f"{self.raw_path}pit_stops.csv"
         if not os.path.exists(path) or os.path.getsize(path) < 10:
-            print("pit_stops.csv is empty or missing; writing empty output.")
+            self.logger.warning("pit_stops.csv is empty or missing; writing empty output.")
             empty = pd.DataFrame()
             empty.to_csv(f"{self.processed_path}pit_stops_clean.csv", index=False)
             return empty
@@ -247,7 +336,7 @@ class F1DataTransformer:
             driver_map = dict(zip(drivers_df["driver_ref"], drivers_df["driver_id"]))
             df["driver_id"] = df["driver_ref"].map(driver_map)
         except Exception:
-            print("Could not map driver_ref to driver_id; defaulting to 0.")
+            self.logger.warning("Could not map driver_ref to driver_id; defaulting to 0.")
             df["driver_id"] = 0
 
         if "time_of_day" in df.columns:
@@ -268,14 +357,14 @@ class F1DataTransformer:
         ).fillna(0).astype(int)
 
         df.to_csv(f"{self.processed_path}pit_stops_clean.csv", index=False)
-        print(f"Transformed {len(df)} pit stops.")
+        self.logger.info("Transformed %s pit stops.", len(df))
         return df
 
     def transform_standings(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Clean and normalize constructor and driver standings."""
         const_path = f"{self.raw_path}constructor_standings.csv"
         if not os.path.exists(const_path) or os.path.getsize(const_path) < 10:
-            print("constructor_standings.csv is empty or missing; skipping.")
+            self.logger.warning("constructor_standings.csv is empty or missing; skipping.")
             df_const = pd.DataFrame()
         else:
             df_const = pd.read_csv(const_path)
@@ -288,7 +377,7 @@ class F1DataTransformer:
                 )
                 df_const["constructor_id"] = df_const["constructor_ref"].map(constructor_map)
             except Exception:
-                print("Could not map constructor_ref to constructor_id; defaulting to 0.")
+                self.logger.warning("Could not map constructor_ref to constructor_id; defaulting to 0.")
                 df_const["constructor_id"] = 0
 
             df_const["points"] = df_const["points"].fillna(0)
@@ -296,13 +385,13 @@ class F1DataTransformer:
             df_const.to_csv(
                 f"{self.processed_path}constructor_standings_clean.csv", index=False
             )
-            print(f"Transformed {len(df_const)} constructor standings.")
+            self.logger.info("Transformed %s constructor standings.", len(df_const))
         else:
-            print("No constructor standings to transform.")
+            self.logger.info("No constructor standings to transform.")
 
         driver_path = f"{self.raw_path}driver_standings.csv"
         if not os.path.exists(driver_path) or os.path.getsize(driver_path) < 10:
-            print("driver_standings.csv is empty or missing; skipping.")
+            self.logger.warning("driver_standings.csv is empty or missing; skipping.")
             df_driver = pd.DataFrame()
         else:
             df_driver = pd.read_csv(driver_path)
@@ -315,7 +404,7 @@ class F1DataTransformer:
                 driver_map = dict(zip(drivers_df["driver_ref"], drivers_df["driver_id"]))
                 df_driver["driver_id"] = df_driver["driver_ref"].map(driver_map)
             except Exception:
-                print("Could not map driver_ref to driver_id; defaulting to 0.")
+                self.logger.warning("Could not map driver_ref to driver_id; defaulting to 0.")
                 df_driver["driver_id"] = 0
 
             df_driver["points"] = df_driver["points"].fillna(0)
@@ -323,16 +412,15 @@ class F1DataTransformer:
             df_driver.to_csv(
                 f"{self.processed_path}driver_standings_clean.csv", index=False
             )
-            print(f"Transformed {len(df_driver)} driver standings.")
+            self.logger.info("Transformed %s driver standings.", len(df_driver))
         else:
-            print("No driver standings to transform.")
+            self.logger.info("No driver standings to transform.")
 
         return df_const, df_driver
 
     def transform_all(self) -> None:
         """Run all transformations in sequence."""
-        print("Starting data transformation.")
-        print("=" * 60)
+        self.logger.info("Starting data transformation.")
 
         try:
             self.transform_circuits()
@@ -343,12 +431,10 @@ class F1DataTransformer:
             self.transform_pit_stops()
             self.transform_standings()
 
-            print("=" * 60)
-            print("All transformations completed.")
-            print(f"Cleaned data written to: {self.processed_path}")
-            print("=" * 60)
+            self.logger.info("All transformations completed.")
+            self.logger.info("Cleaned data written to: %s", self.processed_path)
         except Exception as exc:
-            print(f"Error during transformation: {exc}")
+            self.logger.error("Error during transformation: %s", exc)
             import traceback
 
             traceback.print_exc()

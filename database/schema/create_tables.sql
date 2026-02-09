@@ -71,6 +71,7 @@ CREATE TABLE qualifying (
     q1 VARCHAR(20),
     q2 VARCHAR(20),
     q3 VARCHAR(20),
+    UNIQUE KEY uq_qualifying_race_driver (race_id, driver_id),
     FOREIGN KEY (race_id) REFERENCES races(race_id),
     FOREIGN KEY (driver_id) REFERENCES drivers(driver_id),
     FOREIGN KEY (constructor_id) REFERENCES constructors(constructor_id)
@@ -96,6 +97,8 @@ CREATE TABLE results (
     fastest_lap_time VARCHAR(20),
     fastest_lap_speed VARCHAR(20),
     status_id INT,
+    status VARCHAR(50),
+    UNIQUE KEY uq_results_race_driver_constructor (race_id, driver_id, constructor_id),
     FOREIGN KEY (race_id) REFERENCES races(race_id),
     FOREIGN KEY (driver_id) REFERENCES drivers(driver_id),
     FOREIGN KEY (constructor_id) REFERENCES constructors(constructor_id)
@@ -111,6 +114,7 @@ CREATE TABLE pit_stops (
     time_of_day TIME,
     duration VARCHAR(20),
     milliseconds INT,
+    UNIQUE KEY uq_pit_stops_race_driver_stop (race_id, driver_id, stop),
     FOREIGN KEY (race_id) REFERENCES races(race_id),
     FOREIGN KEY (driver_id) REFERENCES drivers(driver_id)
 );
@@ -124,6 +128,7 @@ CREATE TABLE constructor_standings (
     position INT,
     position_text VARCHAR(10),
     wins INT,
+    UNIQUE KEY uq_constructor_standings_race_constructor (race_id, constructor_id),
     FOREIGN KEY (race_id) REFERENCES races(race_id),
     FOREIGN KEY (constructor_id) REFERENCES constructors(constructor_id)
 );
@@ -137,6 +142,7 @@ CREATE TABLE driver_standings (
     position INT,
     position_text VARCHAR(10),
     wins INT,
+    UNIQUE KEY uq_driver_standings_race_driver (race_id, driver_id),
     FOREIGN KEY (race_id) REFERENCES races(race_id),
     FOREIGN KEY (driver_id) REFERENCES drivers(driver_id)
 );
@@ -145,6 +151,23 @@ CREATE TABLE driver_standings (
 CREATE TABLE status (
     status_id INT PRIMARY KEY,
     status VARCHAR(50)
+);
+
+-- Pipeline metadata
+CREATE TABLE pipeline_runs (
+    run_id VARCHAR(36) PRIMARY KEY,
+    started_at DATETIME,
+    ended_at DATETIME,
+    status VARCHAR(20),
+    source_url VARCHAR(255),
+    mode VARCHAR(20)
+);
+
+CREATE TABLE pipeline_run_tables (
+    run_id VARCHAR(36),
+    table_name VARCHAR(50),
+    rows_loaded INT,
+    PRIMARY KEY (run_id, table_name)
 );
 
 -- Create indexes for better query performance

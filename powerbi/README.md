@@ -42,5 +42,5 @@ To view or edit the dashboard:
 
 1.  Ensure the database is populated by running `python scripts/run_pipeline.py`.
 2.  Open Power BI Desktop.
-3.  Connect to the SQLite database `data/f1_analytics.db` (or your MySQL instance).
+3.  Connect to the SQLite database `f1_analytics.db` in the repo root (or your MySQL instance).
 4.  Refresh the data to load the latest race results.

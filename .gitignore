@@ -5,6 +5,7 @@ venv/
 config.py
 data/raw/*.csv
 data/processed/*.csv
+data/cache/
 *.db
 .DS_Store
 .vscode/

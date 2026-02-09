@@ -25,7 +25,7 @@ DB_CONFIG = {
 
 # API configuration (reserved for future use).
 API_CONFIG = {
-    'base_url': 'http://ergast.com/api/f1',
+    'base_url': 'https://api.jolpi.ca/ergast/f1',
     'rate_limit_delay': 0.5  # seconds between requests
 }
 
@@ -37,7 +37,9 @@ DATA_PATHS = {
 
 # Extraction settings.
 EXTRACTION_CONFIG = {
-    'start_year': 2005,
-    'end_year': 2024
+    'start_year': 2015,  # Project scope: 2015-2025
+    'end_year': 2025,
+    'base_delay': 1.5,
+    'max_retries': 6,
+    'max_base_delay': 8.0
 }
-
